@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+
+# Usage check
+if [ $# -lt 2 ]; then
+    echo "Usage: initfolder <oldname> <newname>"
+    exit 1
+fi
+
+oldname=$1
+newname=$2
+
+# Check if the target directory already exists and prompt if it does
+if [ -d "$SCRATCH/$newname/" ]; then
+    while true; do
+        read -p "Folder $SCRATCH/$newname/ already exists. Do you want to reinitialize it? (Y/N): " yn
+        case $yn in
+            [Yy]* ) break;;
+            [Nn]* ) echo "Initialization canceled."; exit 0;;
+            * ) echo "Please answer Y or N.";;
+        esac
+    done
+fi
+
+# Create tempdir only if it doesn't already exist
+if [ ! -d "tempdir" ]; then
+    mkdir tempdir
+fi
+
+# Move specific RUNNUMBER files to tempdir to prevent accidental deletion
+for file in "RUNNUMBER.template" "RUNNUMBER_builder.py" "RUNNUMBER.sbatch.template"; do
+    if [ -f "$file" ]; then
+        mv "$file" tempdir/
+    else
+        echo "Warning: $file not found, skipping."
+    fi
+done
+
+# Remove any unnecessary files from the current directory, but keep the required files
+find . -type f ! -name "RUNNUMBER.template" ! -name "RUNNUMBER_builder.py" ! -name "RUNNUMBER.sbatch.template" -delete
+
+# Move files back from tempdir if they were moved successfully
+if [ "$(ls -A tempdir 2>/dev/null)" ]; then
+    mv tempdir/* ./
+else
+    echo "No files were moved; tempdir is empty."
+fi
+
+# Clean up tempdir if it's empty
+rmdir tempdir 2>/dev/null || echo "tempdir could not be removed or doesn't exist."
+
+# Use replace.py to update file contents and names
+replace.py "$oldname" "$newname"
+replace.py "RUNNUMBER" "$newname"
+
